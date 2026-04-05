@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="32" fill="#1a3a5c"/>
+  <!-- House shape -->
+  <polygon points="96,30 28,90 44,90 44,162 148,162 148,90 164,90" fill="none" stroke="#ffffff" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Door -->
+  <rect x="78" y="120" width="36" height="42" rx="4" fill="#ffffff" opacity="0.9"/>
+  <!-- Window left -->
+  <rect x="48" y="104" width="24" height="22" rx="3" fill="#93c5fd" opacity="0.85"/>
+  <!-- Window right -->
+  <rect x="120" y="104" width="24" height="22" rx="3" fill="#93c5fd" opacity="0.85"/>
+  <!-- Euro sign on door -->
+  <text x="96" y="148" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#1a3a5c">€</text>
+</svg>

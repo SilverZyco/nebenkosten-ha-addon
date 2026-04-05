@@ -1,0 +1,5 @@
+nebenkosten/frontend/node_modules/
+nebenkosten/frontend/.next/
+nebenkosten/backend/__pycache__/
+nebenkosten/backend/**/__pycache__/
+nebenkosten/backend/**/*.pyc
