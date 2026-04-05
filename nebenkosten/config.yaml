@@ -1,5 +1,5 @@
 name: Nebenkosten Portal
-version: "1.0.0"
+version: "1.0.1"
 slug: nebenkosten
 description: Nebenkostenabrechnung fuer Vermieter und Mieter
 url: "https://github.com/SilverZyco/nebenkosten-ha-addon"
@@ -8,10 +8,10 @@ arch:
   - aarch64
 startup: application
 boot: auto
-ingress: true
-ingress_port: 8099
-panel_icon: mdi:home-account
-panel_title: Nebenkosten
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: Web-Oberflaeche
 options:
   postgres_password: "changeme"
   secret_key: "auto"
