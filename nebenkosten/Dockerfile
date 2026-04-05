@@ -61,9 +61,9 @@ COPY dokumente/ /app/dokumente/
 COPY logo/ /app/logo/
 
 # Addon-Konfiguration
-COPY ha-addon/nebenkosten/nginx.conf /etc/nginx/sites-available/default
-COPY ha-addon/nebenkosten/supervisord.conf /etc/supervisor/conf.d/nebenkosten.conf
-COPY ha-addon/nebenkosten/run.sh /run.sh
+COPY nginx.conf /etc/nginx/sites-available/default
+COPY supervisord.conf /etc/supervisor/conf.d/nebenkosten.conf
+COPY run.sh /run.sh
 RUN chmod +x /run.sh
 
 # Nginx default config entfernen
