@@ -1,0 +1,30 @@
+name: Nebenkosten Portal
+version: "1.0.0"
+slug: nebenkosten
+description: Nebenkostenabrechnung für Vermieter und Mieter
+url: "https://github.com/yourusername/nebenkosten-portal"
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:home-account
+panel_title: Nebenkosten
+options:
+  postgres_password: "changeme"
+  secret_key: ""
+  openai_api_key: ""
+  openai_model: "gpt-4o"
+  ocr_enabled: true
+  ai_enabled: true
+schema:
+  postgres_password: str
+  secret_key: str
+  openai_api_key: str
+  openai_model: str
+  ocr_enabled: bool
+  ai_enabled: bool
+map:
+  - data:rw
