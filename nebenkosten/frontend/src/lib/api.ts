@@ -19,6 +19,7 @@ api.interceptors.response.use(
         return api(error.config);
       } catch {
         if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_user");
           window.location.href = "/";
         }
       }
