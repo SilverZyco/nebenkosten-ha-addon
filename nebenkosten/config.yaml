@@ -2,7 +2,7 @@ name: Nebenkosten Portal
 version: "1.0.0"
 slug: nebenkosten
 description: Nebenkostenabrechnung für Vermieter und Mieter
-url: "https://github.com/yourusername/nebenkosten-portal"
+url: "https://github.com/SilverZyco/nebenkosten-ha-addon"
 arch:
   - amd64
   - aarch64
@@ -14,8 +14,8 @@ panel_icon: mdi:home-account
 panel_title: Nebenkosten
 options:
   postgres_password: "changeme"
-  secret_key: ""
-  openai_api_key: ""
+  secret_key: "auto"
+  openai_api_key: "none"
   openai_model: "gpt-4o"
   ocr_enabled: true
   ai_enabled: true

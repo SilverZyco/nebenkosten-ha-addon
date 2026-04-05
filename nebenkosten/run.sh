@@ -11,8 +11,8 @@ OPENAI_MODEL=$(jq -r '.openai_model // "gpt-4o"' "$OPTIONS")
 OCR_ENABLED=$(jq -r '.ocr_enabled // "true"' "$OPTIONS")
 AI_ENABLED=$(jq -r '.ai_enabled // "true"' "$OPTIONS")
 
-# Secret Key auto-generieren falls leer
-if [ -z "$SECRET_KEY" ]; then
+# Secret Key auto-generieren falls leer oder "auto"
+if [ -z "$SECRET_KEY" ] || [ "$SECRET_KEY" = "auto" ]; then
     SECRET_KEY_FILE="/data/secret_key"
     if [ ! -f "$SECRET_KEY_FILE" ]; then
         openssl rand -hex 32 > "$SECRET_KEY_FILE"
@@ -33,6 +33,7 @@ export ACCESS_TOKEN_EXPIRE_MINUTES=60
 export REFRESH_TOKEN_EXPIRE_DAYS=30
 export UPLOAD_DIR=/data/uploads
 export MAX_UPLOAD_SIZE_MB=50
+[ "$OPENAI_API_KEY" = "none" ] && OPENAI_API_KEY=""
 export OPENAI_API_KEY="${OPENAI_API_KEY}"
 export OPENAI_MODEL="${OPENAI_MODEL}"
 export OCR_ENABLED="${OCR_ENABLED}"
