@@ -45,17 +45,15 @@ export NEXT_PUBLIC_API_URL=""
 EOF
 
 # Verzeichnisse vorbereiten
-mkdir -p /data/uploads /var/log/supervisor /var/run/postgresql
+mkdir -p /data/uploads /data/postgres /var/log/supervisor /var/run/postgresql
 chown postgres:postgres /var/run/postgresql
+chown -R postgres:postgres /data/postgres
 
 # PostgreSQL initialisieren (nur beim ersten Start)
 if [ ! -f "/data/postgres/PG_VERSION" ]; then
     echo ">>> Initialisiere PostgreSQL Datenbank..."
-    chown -R postgres:postgres /data/postgres
     su postgres -c "/usr/lib/postgresql/16/bin/initdb -D /data/postgres --encoding=UTF8 --locale=de_DE.UTF-8 || /usr/lib/postgresql/16/bin/initdb -D /data/postgres --encoding=UTF8"
 fi
-
-chown -R postgres:postgres /data/postgres
 
 # PostgreSQL kurz starten um DB + User anzulegen
 echo ">>> Starte PostgreSQL für Setup..."
