@@ -3,3 +3,4 @@ nebenkosten/frontend/.next/
 nebenkosten/backend/__pycache__/
 nebenkosten/backend/**/__pycache__/
 nebenkosten/backend/**/*.pyc
+nebenkosten/dokumente/
