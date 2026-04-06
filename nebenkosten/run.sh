@@ -46,6 +46,12 @@ export LOGO_PATH=/app/logo/logo.png
 export NEXT_PUBLIC_API_URL=""
 EOF
 
+# Dokumente aus Share laden falls vorhanden
+if [ -d "/share/nebenkosten-dokumente" ]; then
+    echo ">>> Lade Dokumente aus /share/nebenkosten-dokumente"
+    cp -r /share/nebenkosten-dokumente/. /app/dokumente/
+fi
+
 # Verzeichnisse vorbereiten
 mkdir -p /data/uploads /data/postgres /var/log/supervisor /var/run/postgresql
 chown postgres:postgres /var/run/postgresql

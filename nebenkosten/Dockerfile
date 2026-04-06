@@ -57,8 +57,8 @@ COPY --from=frontend-builder /frontend/.next/static/ /app/frontend/.next/static/
 COPY --from=frontend-builder /frontend/public/ /app/frontend/public/
 
 # Statische Dateien
-COPY dokumente/ /app/dokumente/
 COPY logo/ /app/logo/
+RUN mkdir -p /app/dokumente
 
 # Addon-Konfiguration
 COPY nginx.conf /etc/nginx/sites-available/default
