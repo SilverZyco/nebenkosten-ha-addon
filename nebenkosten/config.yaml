@@ -1,5 +1,5 @@
 name: Nebenkosten Portal
-version: "1.0.4"
+version: "1.0.5"
 slug: nebenkosten
 description: Nebenkostenabrechnung fuer Vermieter und Mieter
 url: "https://github.com/SilverZyco/nebenkosten-ha-addon"
@@ -20,6 +20,7 @@ options:
   ocr_enabled: true
   ai_enabled: true
   restore_from: "none"
+  force_restore: false
 schema:
   postgres_password: str
   secret_key: str
@@ -28,6 +29,7 @@ schema:
   ocr_enabled: bool
   ai_enabled: bool
   restore_from: str
+  force_restore: bool
 map:
   - type: data
     read_only: false

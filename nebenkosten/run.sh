@@ -11,6 +11,7 @@ OPENAI_MODEL=$(jq -r '.openai_model // "gpt-4o"' "$OPTIONS")
 OCR_ENABLED=$(jq -r '.ocr_enabled // "true"' "$OPTIONS")
 AI_ENABLED=$(jq -r '.ai_enabled // "true"' "$OPTIONS")
 RESTORE_FROM=$(jq -r '.restore_from // "none"' "$OPTIONS")
+FORCE_RESTORE=$(jq -r '.force_restore // "false"' "$OPTIONS")
 
 # Secret Key auto-generieren falls leer oder "auto"
 if [ -z "$SECRET_KEY" ] || [ "$SECRET_KEY" = "auto" ]; then
@@ -67,17 +68,22 @@ su postgres -c "psql -c \"SELECT 1 FROM pg_database WHERE datname='nebenkosten'\
 # PostgreSQL wieder stoppen (supervisord übernimmt)
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres stop -w"
 
-# Backup einspielen falls angegeben und DB leer
+# Backup einspielen
 if [ "$RESTORE_FROM" != "none" ] && [ -f "$RESTORE_FROM" ]; then
     USER_COUNT=$(su postgres -c "psql -U nebenkosten -d nebenkosten -tAc 'SELECT COUNT(*) FROM users;'" 2>/dev/null || echo "0")
-    if [ "$USER_COUNT" = "0" ]; then
+    if [ "$USER_COUNT" = "0" ] || [ "$FORCE_RESTORE" = "true" ]; then
         echo ">>> Spiele Backup ein: $RESTORE_FROM"
         su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres -o '-c listen_addresses=localhost -c unix_socket_directories=/var/run/postgresql' start -w"
+        if [ "$FORCE_RESTORE" = "true" ]; then
+            echo ">>> Force-Restore: Datenbank wird zurückgesetzt..."
+            su postgres -c "psql -c 'DROP DATABASE IF EXISTS nebenkosten;'"
+            su postgres -c "psql -c 'CREATE DATABASE nebenkosten OWNER nebenkosten;'"
+        fi
         su postgres -c "psql -d nebenkosten < '$RESTORE_FROM'"
         su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres stop -w"
         echo ">>> Backup erfolgreich eingespielt."
     else
-        echo ">>> Datenbank hat bereits Daten, Backup wird übersprungen."
+        echo ">>> Datenbank hat bereits Daten. Setze force_restore: true um zu überschreiben."
     fi
 fi
 
