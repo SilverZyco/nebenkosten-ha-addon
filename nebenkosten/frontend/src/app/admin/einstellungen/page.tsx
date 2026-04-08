@@ -58,7 +58,7 @@ export default function EinstellungenPage() {
     try {
       const response = await api.get("/admin/backup/export", { responseType: "blob" });
       const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const filename = `nebenkosten_backup_${timestamp}.sql`;
+      const filename = `nebenkosten_backup_${timestamp}.zip`;
       const url = URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement("a");
       a.href = url;
@@ -76,8 +76,8 @@ export default function EinstellungenPage() {
   async function handleRestoreFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.endsWith(".sql")) {
-      toast.error("Nur .sql Dateien erlaubt");
+    if (!file.name.endsWith(".sql") && !file.name.endsWith(".zip")) {
+      toast.error("Nur .zip oder .sql Dateien erlaubt");
       return;
     }
 
@@ -265,7 +265,7 @@ export default function EinstellungenPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".sql"
+                accept=".zip,.sql"
                 className="hidden"
                 onChange={handleRestoreFile}
               />
