@@ -2,8 +2,8 @@
 
 import Topbar from "@/components/layout/Topbar";
 import { useTheme } from "@/lib/theme-context";
-import { Moon, Sun, Monitor, Smartphone, Info, HardDrive, RefreshCw, CheckCircle2, AlertCircle, FileArchive } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Moon, Sun, Monitor, Smartphone, Info, HardDrive, RefreshCw, CheckCircle2, AlertCircle, FileArchive, Download, Upload, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -28,9 +28,12 @@ export default function EinstellungenPage() {
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [backupLoading, setBackupLoading] = useState(true);
   const [backupRunning, setBackupRunning] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.get("/api/v1/admin/backup/status")
+    api.get("/admin/backup/status")
       .then(r => setBackup(r.data))
       .catch(() => setBackup(null))
       .finally(() => setBackupLoading(false));
@@ -39,14 +42,68 @@ export default function EinstellungenPage() {
   async function runBackup() {
     setBackupRunning(true);
     try {
-      await api.post("/api/v1/admin/backup/run");
+      await api.post("/admin/backup/run");
       toast.success("Backup gestartet");
-      const r = await api.get("/api/v1/admin/backup/status");
+      const r = await api.get("/admin/backup/status");
       setBackup(r.data);
     } catch {
       toast.error("Backup konnte nicht gestartet werden");
     } finally {
       setBackupRunning(false);
+    }
+  }
+
+  async function downloadBackup() {
+    setExporting(true);
+    try {
+      const response = await api.get("/admin/backup/export", { responseType: "blob" });
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const filename = `nebenkosten_backup_${timestamp}.sql`;
+      const url = URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Backup heruntergeladen");
+    } catch {
+      toast.error("Export fehlgeschlagen");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleRestoreFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith(".sql")) {
+      toast.error("Nur .sql Dateien erlaubt");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Datenbank wirklich mit "${file.name}" überschreiben?\n\nAlle aktuellen Daten gehen verloren!`
+    );
+    if (!confirmed) {
+      e.target.value = "";
+      return;
+    }
+
+    setRestoring(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await api.post("/admin/backup/restore", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 300000,
+      });
+      toast.success("Datenbank erfolgreich wiederhergestellt – bitte Seite neu laden");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg ? `Restore fehlgeschlagen: ${msg}` : "Restore fehlgeschlagen");
+    } finally {
+      setRestoring(false);
+      e.target.value = "";
     }
   }
 
@@ -164,92 +221,134 @@ export default function EinstellungenPage() {
           </div>
         </div>
 
-        {/* Backup */}
+        {/* Datensicherung */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <HardDrive className="w-4 h-4 text-blue-600" />
-                Datensicherung
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                Tägliches Backup der Datenbank und Uploads
-              </p>
-            </div>
-            <button
-              onClick={runBackup}
-              disabled={backupRunning || !backup?.configured}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
-            >
-              <RefreshCw className={`w-4 h-4 ${backupRunning ? "animate-spin" : ""}`} />
-              {backupRunning ? "Läuft…" : "Jetzt sichern"}
-            </button>
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-blue-600" />
+              Datensicherung
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              Datenbank auf PC sichern und wiederherstellen
+            </p>
           </div>
 
           <div className="px-5 py-5 space-y-4">
-            {backupLoading ? (
-              <div className="text-sm text-gray-400">Lade Status…</div>
-            ) : !backup || !backup.configured ? (
-              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Backup nicht konfiguriert</p>
-                  <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                    Der Backup-Container ist noch nicht gestartet. Auf Synology: <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">docker compose --profile backup up -d backup</code>
-                  </p>
-                </div>
+
+            {/* Export & Restore Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Export */}
+              <button
+                onClick={downloadBackup}
+                disabled={exporting}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                {exporting
+                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                  : <Download className="w-4 h-4" />
+                }
+                {exporting ? "Exportiere…" : "Backup herunterladen"}
+              </button>
+
+              {/* Restore */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={restoring}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                {restoring
+                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                  : <Upload className="w-4 h-4" />
+                }
+                {restoring ? "Stelle wieder her…" : "Backup einspielen"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".sql"
+                className="hidden"
+                onChange={handleRestoreFile}
+              />
+            </div>
+
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Backup herunterladen</strong> speichert die komplette Datenbank als SQL-Datei auf deinem PC.
+                <strong className="ml-1">Backup einspielen</strong> stellt eine zuvor heruntergeladene .sql Datei wieder her.
+                Beim Restore gehen alle aktuellen Daten verloren.
+              </p>
+            </div>
+
+            {/* Automatisches Server-Backup (optional) */}
+            <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-gray-400" />
+                  Automatisches Server-Backup
+                </p>
+                <button
+                  onClick={runBackup}
+                  disabled={backupRunning || !backup?.configured}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${backupRunning ? "animate-spin" : ""}`} />
+                  {backupRunning ? "Läuft…" : "Jetzt sichern"}
+                </button>
               </div>
-            ) : (
-              <>
-                {/* Status-Übersicht */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3 text-center">
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">{backup.file_count}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Backups</div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3 text-center">
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">{backup.total_size_mb.toFixed(0)} MB</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Gesamt</div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">Aktiv</span>
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">tägl. 02:00 Uhr</div>
-                  </div>
-                </div>
 
-                {backup.last_backup && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Letztes Backup: <strong className="text-gray-900 dark:text-white">{backup.last_backup}</strong>
-                  </p>
-                )}
-
-                {/* Dateiliste */}
-                {backup.files.length > 0 && (
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    <div className="max-h-48 overflow-y-auto">
-                      {backup.files.map((f) => (
-                        <div key={f.filename} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0">
-                          <FileArchive className="w-4 h-4 text-blue-400 shrink-0" />
-                          <span className="text-xs text-gray-700 dark:text-gray-300 flex-1 font-mono truncate">{f.filename}</span>
-                          <span className="text-xs text-gray-400 shrink-0">{f.size_mb} MB</span>
-                          {f.created_at && <span className="text-xs text-gray-400 shrink-0">{f.created_at}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                  <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    Backups werden in <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">backup-data/</code> gespeichert und über Synology Cloud Sync mit Dropbox synchronisiert. Backups älter als 14 Tage werden automatisch gelöscht.
+              {backupLoading ? (
+                <div className="text-sm text-gray-400">Lade Status…</div>
+              ) : !backup || !backup.configured ? (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Nicht konfiguriert. Im HA-Addon werden Backups automatisch im /data Verzeichnis gespeichert.
                   </p>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-center">
+                      <div className="text-base font-bold text-gray-900 dark:text-white">{backup.file_count}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Backups</div>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-center">
+                      <div className="text-base font-bold text-gray-900 dark:text-white">{backup.total_size_mb.toFixed(0)} MB</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Gesamt</div>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                        <span className="text-xs font-bold text-gray-900 dark:text-white">Aktiv</span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">tägl. 02:00</div>
+                    </div>
+                  </div>
+
+                  {backup.last_backup && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Letztes Backup: <strong className="text-gray-900 dark:text-white">{backup.last_backup}</strong>
+                    </p>
+                  )}
+
+                  {backup.files.length > 0 && (
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <div className="max-h-40 overflow-y-auto">
+                        {backup.files.map((f) => (
+                          <div key={f.filename} className="flex items-center gap-3 px-3 py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                            <FileArchive className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            <span className="text-xs text-gray-700 dark:text-gray-300 flex-1 font-mono truncate">{f.filename}</span>
+                            <span className="text-xs text-gray-400 shrink-0">{f.size_mb} MB</span>
+                            {f.created_at && <span className="text-xs text-gray-400 shrink-0">{f.created_at}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
