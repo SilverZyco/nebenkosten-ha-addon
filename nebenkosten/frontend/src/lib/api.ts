@@ -12,8 +12,8 @@ export const api = axios.create({
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const isRefreshCall = error.config?.url?.includes("/auth/refresh");
-    if (error.response?.status === 401 && !error.config._retry && !isRefreshCall) {
+    const isAuthCall = error.config?.url?.includes("/auth/");
+    if (error.response?.status === 401 && !error.config._retry && !isAuthCall) {
       error.config._retry = true;
       try {
         await api.post("/auth/refresh");
