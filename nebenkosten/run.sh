@@ -101,7 +101,7 @@ if [ "$RESET_ADMIN_EMAIL" != "none" ] && [ "$RESET_ADMIN_PASSWORD" != "none" ]; 
     su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres -o '-c listen_addresses=localhost -c unix_socket_directories=/var/run/postgresql' start -w"
     # Passwort-Hash mit Python generieren
     NEW_HASH=$(python3 -c "from passlib.context import CryptContext; ctx = CryptContext(schemes=['bcrypt']); print(ctx.hash('${RESET_ADMIN_PASSWORD}'))")
-    su postgres -c "psql -U nebenkosten -d nebenkosten -c \"UPDATE users SET password_hash='${NEW_HASH}', email='${RESET_ADMIN_EMAIL}' WHERE role='admin' LIMIT 1;\""
+    su postgres -c "psql -U nebenkosten -d nebenkosten -c \"UPDATE users SET password_hash='${NEW_HASH}', email='${RESET_ADMIN_EMAIL}' WHERE id = (SELECT id FROM users WHERE role='admin' ORDER BY created_at LIMIT 1);\""
     su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres stop -w"
     echo ">>> Admin-Passwort erfolgreich zurückgesetzt."
 fi
