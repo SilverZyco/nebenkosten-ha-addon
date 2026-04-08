@@ -7,7 +7,7 @@ import { useSidebar } from "@/lib/sidebar-context";
 import {
   LayoutDashboard, Building2, Users, FileText, Inbox,
   Gauge, Calculator, Upload, ChevronLeft, ChevronRight,
-  UserCircle, X, ScrollText, Settings, TrendingUp, FolderOpen,
+  UserCircle, X, ScrollText, Settings, TrendingUp, FolderOpen, BookMarked,
 } from "lucide-react";
 import { ThemeToggleButton, LogoutButton } from "./SidebarShared";
 
@@ -17,6 +17,7 @@ const navItems = [
   { href: "/admin/mietverhaeltnisse", label: "Mietverhältnisse", icon: Users },
   { href: "/admin/mietvertrag", label: "Mietverträge", icon: ScrollText },
   { href: "/admin/hausunterlagen", label: "Hausunterlagen", icon: FolderOpen },
+  { href: "/admin/anleitungen", label: "Bedienungsanleitungen", icon: BookMarked },
   { href: "/admin/mieterhoeung", label: "Mieterhöhungen", icon: TrendingUp },
   { href: "/admin/dokumente", label: "Dokumente", icon: FileText },
   { href: "/admin/ki-inbox", label: "KI-Inbox", icon: Inbox, badge: true },

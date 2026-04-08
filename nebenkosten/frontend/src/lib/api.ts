@@ -222,3 +222,24 @@ export const tenantHouseDocumentsApi = {
   pdfUrl: (id: string) => `${API_BASE}/api/v1/tenant/house-documents/${id}/pdf`,
   odtUrl: (id: string) => `${API_BASE}/api/v1/tenant/house-documents/${id}/odt`,
 };
+
+// ---- Admin: Instructions (Bedienungsanleitungen) ----
+export const instructionsApi = {
+  list: () => api.get("/admin/instructions"),
+  upload: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post("/admin/instructions", fd, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+  update: (id: string, data: { title?: string; tenant_user_id?: string | null }) =>
+    api.patch(`/admin/instructions/${id}`, data),
+  send: (id: string) => api.post(`/admin/instructions/${id}/send`),
+  delete: (id: string) => api.delete(`/admin/instructions/${id}`),
+  downloadUrl: (id: string) => `${API_BASE}/api/v1/admin/instructions/${id}/download`,
+};
+
+// ---- Tenant: Instructions ----
+export const tenantInstructionsApi = {
+  list: () => api.get("/tenant/instructions"),
+  downloadUrl: (id: string) => `${API_BASE}/api/v1/tenant/instructions/${id}/download`,
+};

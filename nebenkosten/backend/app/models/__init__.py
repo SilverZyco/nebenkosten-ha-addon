@@ -7,6 +7,7 @@ from app.models.billing import BillingPeriod, BillingStatus, ApartmentBilling
 from app.models.audit_log import AuditLog
 from app.models.rental_contract import RentalContract, RentalContractStatus
 from app.models.house_document import HouseDocument, HouseDocumentStatus
+from app.models.instruction import Instruction
 
 __all__ = [
     "User", "UserRole",
@@ -18,4 +19,5 @@ __all__ = [
     "AuditLog",
     "RentalContract", "RentalContractStatus",
     "HouseDocument", "HouseDocumentStatus",
+    "Instruction",
 ]

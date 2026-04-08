@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
-import { LayoutDashboard, FileText, Receipt, BookOpen, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, FileText, Receipt, BookOpen, BookMarked, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { ThemeToggleButton, LogoutButton } from "./SidebarShared";
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/mieter/abrechnungen", label: "Abrechnungen", icon: Receipt },
   { href: "/mieter/dokumente", label: "Dokumente", icon: FileText },
   { href: "/mieter/vertraege", label: "Verträge & Hausunterlagen", icon: BookOpen },
+  { href: "/mieter/anleitungen", label: "Bedienungsanleitungen", icon: BookMarked },
 ];
 
 interface Props {
