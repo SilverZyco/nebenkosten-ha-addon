@@ -265,11 +265,17 @@ async def restore_backup(
         except subprocess.TimeoutExpired:
             raise HTTPException(status_code=504, detail="Restore Timeout (>300s)")
 
+        # Harmlose Fehler ignorieren (z.B. "already exists" wenn alembic Tabellen vorab erstellt hat)
         if restore_result.returncode != 0:
             stderr = restore_result.stderr.decode("utf-8", errors="replace")
-            error_lines = [l for l in stderr.splitlines() if "ERROR" in l]
-            if error_lines:
-                raise HTTPException(status_code=500, detail="\n".join(error_lines[-10:]))
+            fatal_errors = [
+                l for l in stderr.splitlines()
+                if "ERROR" in l
+                and "already exists" not in l
+                and "does not exist" not in l
+            ]
+            if fatal_errors:
+                raise HTTPException(status_code=500, detail="\n".join(fatal_errors[-10:]))
 
         # 4. uploads.tar.gz rekursiv suchen → UPLOAD_DIR
         uploads_archive = None
