@@ -288,4 +288,19 @@ async def restore_backup(
             except tarfile.TarError as e:
                 raise HTTPException(status_code=500, detail=f"Fehler beim Entpacken der Uploads: {e}")
 
-    return {"success": True, "message": "Datenbank und Dateien erfolgreich wiederhergestellt"}
+    # Alembic-Migrationen nach Restore ausführen (stellt fehlende Tabellen/Spalten sicher)
+    try:
+        alembic_result = subprocess.run(
+            ["python", "-m", "alembic", "upgrade", "head"],
+            capture_output=True,
+            cwd="/app/backend",
+            env={**os.environ},
+            timeout=120,
+        )
+        if alembic_result.returncode != 0:
+            # Nicht fatal - nur loggen
+            print(f"Alembic nach Restore: {alembic_result.stderr.decode('utf-8', errors='replace')[-300:]}")
+    except Exception:
+        pass
+
+    return {"success": True, "message": "Datenbank und Dateien erfolgreich wiederhergestellt. Bitte Seite neu laden."}
