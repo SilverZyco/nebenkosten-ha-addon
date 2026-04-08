@@ -199,13 +199,21 @@ async def restore_backup(
         # 1. Archiv entpacken
         try:
             with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
-                tar.extractall(tmpdir)
+                try:
+                    tar.extractall(tmpdir, filter="data")
+                except TypeError:
+                    tar.extractall(tmpdir)  # Python < 3.12
         except tarfile.TarError as e:
             raise HTTPException(status_code=400, detail=f"Ungültige tar.gz-Datei: {e}")
 
-        # 2. database.sql finden
-        sql_path = os.path.join(tmpdir, "database.sql")
-        if not os.path.isfile(sql_path):
+        # 2. database.sql rekursiv suchen (kann in Unterverzeichnis liegen)
+        sql_path = None
+        for root, _, files in os.walk(tmpdir):
+            if "database.sql" in files:
+                sql_path = os.path.join(root, "database.sql")
+                break
+
+        if not sql_path:
             raise HTTPException(status_code=400, detail="database.sql nicht im Archiv gefunden")
 
         # 3. Schema leeren und SQL einspielen
@@ -251,9 +259,14 @@ async def restore_backup(
             if error_lines:
                 raise HTTPException(status_code=500, detail="\n".join(error_lines[-10:]))
 
-        # 4. uploads.tar.gz → UPLOAD_DIR
-        uploads_archive = os.path.join(tmpdir, "uploads.tar.gz")
-        if os.path.isfile(uploads_archive):
+        # 4. uploads.tar.gz rekursiv suchen → UPLOAD_DIR
+        uploads_archive = None
+        for root, _, files in os.walk(tmpdir):
+            if "uploads.tar.gz" in files:
+                uploads_archive = os.path.join(root, "uploads.tar.gz")
+                break
+
+        if uploads_archive and os.path.isfile(uploads_archive):
             if os.path.isdir(UPLOAD_DIR):
                 shutil.rmtree(UPLOAD_DIR)
             os.makedirs(UPLOAD_DIR, exist_ok=True)
