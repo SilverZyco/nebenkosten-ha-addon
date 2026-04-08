@@ -95,34 +95,10 @@ if [ "$RESTORE_FROM" != "none" ] && [ -f "$RESTORE_FROM" ]; then
     fi
 fi
 
-# Admin-Passwort zurücksetzen falls gewünscht
+# Admin-Passwort zurücksetzen: Info in Datei speichern, Reset erfolgt nach alembic-Migrationen
 if [ "$RESET_ADMIN_EMAIL" != "none" ] && [ "$RESET_ADMIN_PASSWORD" != "none" ]; then
-    echo ">>> Setze Admin-Passwort zurück für: $RESET_ADMIN_EMAIL"
-    su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres -o '-c listen_addresses=localhost -c unix_socket_directories=/var/run/postgresql' start -w"
-    # Python übernimmt Hash-Generierung UND DB-Update (vermeidet Shell-Escaping von $2b$...)
-    RESET_ADMIN_EMAIL="$RESET_ADMIN_EMAIL" \
-    RESET_ADMIN_PASSWORD="$RESET_ADMIN_PASSWORD" \
-    DATABASE_URL_SYNC="postgresql://nebenkosten:${POSTGRES_PASSWORD}@localhost/nebenkosten" \
-    python3 << 'PYEOF'
-import os
-from passlib.context import CryptContext
-from sqlalchemy import create_engine, text
-
-ctx = CryptContext(schemes=['bcrypt'])
-new_hash = ctx.hash(os.environ['RESET_ADMIN_PASSWORD'])
-email = os.environ['RESET_ADMIN_EMAIL']
-db_url = os.environ['DATABASE_URL_SYNC']
-
-engine = create_engine(db_url)
-with engine.connect() as conn:
-    conn.execute(
-        text("UPDATE users SET password_hash=:hash, email=:email WHERE id=(SELECT id FROM users WHERE role='admin' ORDER BY created_at LIMIT 1)"),
-        {'hash': new_hash, 'email': email}
-    )
-    conn.commit()
-print(f'>>> Admin-Passwort erfolgreich zurückgesetzt für: {email}')
-PYEOF
-    su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres stop -w"
+    echo ">>> Admin-Reset angefordert für: $RESET_ADMIN_EMAIL (wird nach DB-Migration ausgeführt)"
+    printf '{"email":"%s","password":"%s"}' "$RESET_ADMIN_EMAIL" "$RESET_ADMIN_PASSWORD" > /data/reset_admin.json
 fi
 
 echo ">>> Starte alle Dienste..."
