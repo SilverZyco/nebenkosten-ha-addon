@@ -3,8 +3,8 @@ import os
 import re
 import shutil
 import subprocess
+import tarfile
 import tempfile
-import zipfile
 from datetime import datetime
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -13,8 +13,8 @@ from app.models.user import User
 
 router = APIRouter(prefix="/backup", tags=["admin-backup"])
 
-BACKUP_DIR  = os.environ.get("BACKUP_OUTPUT_DIR", "/backup-out")
-UPLOAD_DIR  = os.environ.get("UPLOAD_DIR", "/data/uploads")
+BACKUP_DIR = os.environ.get("BACKUP_OUTPUT_DIR", "/backup-out")
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/data/uploads")
 
 # PostgreSQL 16 Binaries (HA-Addon), Fallback auf PATH
 _PG_BIN = "/usr/lib/postgresql/16/bin"
@@ -103,23 +103,24 @@ async def run_backup(_: User = Depends(get_current_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/export")
-async def export_backup(_: User = Depends(get_current_admin)):
+@router.get("/download")
+async def download_backup(_: User = Depends(get_current_admin)):
     """
-    Erstellt ein vollständiges Backup als ZIP:
-    - database.sql  (pg_dump der gesamten Datenbank)
-    - uploads/      (alle hochgeladenen Dateien, Dokumente, Bilder)
+    Erstellt ein vollständiges Backup on-the-fly und schickt es als Download:
+      1. pg_dump → database.sql
+      2. uploads/ → uploads.tar.gz
+      3. Beide in nebenkosten_DATUM.tar.gz gepackt → Browser-Download
     """
     db = _db_credentials()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"nebenkosten_backup_{timestamp}.zip"
+    archive_name = f"nebenkosten_{timestamp}.tar.gz"
 
     # 1. Datenbank dumpen
     try:
         result = subprocess.run(
             [
                 PG_DUMP,
-                "--clean", "--if-exists", "--no-owner", "--no-acl",
+                "--no-owner", "--no-acl",
                 "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"],
             ],
             capture_output=True,
@@ -137,30 +138,36 @@ async def export_backup(_: User = Depends(get_current_admin)):
             detail=result.stderr.decode("utf-8", errors="replace")[-500:],
         )
 
-    sql_data = result.stdout
+    sql_bytes = result.stdout
 
-    # 2. ZIP im Speicher erstellen
+    # 2. Haupt-Archiv im Speicher bauen
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        # Datenbank
-        zf.writestr("database.sql", sql_data)
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
 
-        # Uploads-Ordner
-        if os.path.isdir(UPLOAD_DIR):
-            for root, _, files in os.walk(UPLOAD_DIR):
-                for fname in files:
-                    fpath = os.path.join(root, fname)
-                    arcname = os.path.join("uploads", os.path.relpath(fpath, UPLOAD_DIR))
-                    zf.write(fpath, arcname)
+        # database.sql hinzufügen
+        sql_info = tarfile.TarInfo(name="database.sql")
+        sql_info.size = len(sql_bytes)
+        tar.addfile(sql_info, io.BytesIO(sql_bytes))
 
-    zip_bytes = buf.getvalue()
+        # uploads.tar.gz bauen und einbetten
+        uploads_buf = io.BytesIO()
+        with tarfile.open(fileobj=uploads_buf, mode="w:gz") as uploads_tar:
+            if os.path.isdir(UPLOAD_DIR):
+                uploads_tar.add(UPLOAD_DIR, arcname="uploads")
+        uploads_bytes = uploads_buf.getvalue()
+
+        uploads_info = tarfile.TarInfo(name="uploads.tar.gz")
+        uploads_info.size = len(uploads_bytes)
+        tar.addfile(uploads_info, io.BytesIO(uploads_bytes))
+
+    archive_bytes = buf.getvalue()
 
     return StreamingResponse(
-        io.BytesIO(zip_bytes),
-        media_type="application/zip",
+        io.BytesIO(archive_bytes),
+        media_type="application/x-tar",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Length": str(len(zip_bytes)),
+            "Content-Disposition": f'attachment; filename="{archive_name}"',
+            "Content-Length": str(len(archive_bytes)),
         },
     )
 
@@ -171,17 +178,15 @@ async def restore_backup(
     _: User = Depends(get_current_admin),
 ):
     """
-    Stellt ein vollständiges Backup aus einer ZIP-Datei wieder her.
-    Erwartet das Format wie es /export erstellt:
-    - database.sql
-    - uploads/ (optional)
+    Spielt ein vollständiges Backup aus einer .tar.gz-Datei ein:
+      1. In /tmp entpacken
+      2. database.sql finden
+      3. psql: Schema leeren → SQL einspielen
+      4. uploads.tar.gz → UPLOAD_DIR entpacken
+      5. Temp-Verzeichnis löschen
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Keine Datei")
-
-    fname_lower = file.filename.lower()
-    if not (fname_lower.endswith(".zip") or fname_lower.endswith(".sql")):
-        raise HTTPException(status_code=400, detail="Nur .zip oder .sql Dateien erlaubt")
+    if not file.filename or not file.filename.endswith(".tar.gz"):
+        raise HTTPException(status_code=400, detail="Nur .tar.gz Dateien werden akzeptiert")
 
     content = await file.read()
     if not content:
@@ -191,50 +196,71 @@ async def restore_backup(
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
-        if fname_lower.endswith(".zip"):
-            # ZIP entpacken
-            try:
-                with zipfile.ZipFile(io.BytesIO(content)) as zf:
-                    zf.extractall(tmpdir)
-            except zipfile.BadZipFile:
-                raise HTTPException(status_code=400, detail="Ungültige ZIP-Datei")
-
-            sql_path = os.path.join(tmpdir, "database.sql")
-            if not os.path.isfile(sql_path):
-                raise HTTPException(status_code=400, detail="database.sql nicht in ZIP gefunden")
-
-            with open(sql_path, "rb") as f:
-                sql_data = f.read()
-
-            # Uploads wiederherstellen
-            uploads_src = os.path.join(tmpdir, "uploads")
-            if os.path.isdir(uploads_src):
-                if os.path.isdir(UPLOAD_DIR):
-                    shutil.rmtree(UPLOAD_DIR)
-                shutil.copytree(uploads_src, UPLOAD_DIR)
-
-        else:
-            # Einfaches .sql File
-            sql_data = content
-
-        # Datenbank wiederherstellen
+        # 1. Archiv entpacken
         try:
-            result = subprocess.run(
-                [PSQL, "-h", db["host"], "-p", db["port"], "-U", db["user"], "-d", db["dbname"]],
+            with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+                tar.extractall(tmpdir)
+        except tarfile.TarError as e:
+            raise HTTPException(status_code=400, detail=f"Ungültige tar.gz-Datei: {e}")
+
+        # 2. database.sql finden
+        sql_path = os.path.join(tmpdir, "database.sql")
+        if not os.path.isfile(sql_path):
+            raise HTTPException(status_code=400, detail="database.sql nicht im Archiv gefunden")
+
+        # 3. Schema leeren und SQL einspielen
+        pg_env = {**os.environ, "PGPASSWORD": db["password"]}
+        pg_base = ["-h", db["host"], "-p", db["port"], "-U", db["user"]]
+
+        # Schema leeren
+        drop_sql = "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;"
+        try:
+            drop_result = subprocess.run(
+                [PSQL] + pg_base + ["-d", db["dbname"], "-c", drop_sql],
+                capture_output=True,
+                env=pg_env,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            raise HTTPException(status_code=504, detail="Schema-Reset Timeout")
+
+        if drop_result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=drop_result.stderr.decode("utf-8", errors="replace")[-300:],
+            )
+
+        # SQL einspielen
+        with open(sql_path, "rb") as f:
+            sql_data = f.read()
+
+        try:
+            restore_result = subprocess.run(
+                [PSQL] + pg_base + ["-d", db["dbname"]],
                 input=sql_data,
                 capture_output=True,
-                env={**os.environ, "PGPASSWORD": db["password"]},
+                env=pg_env,
                 timeout=300,
             )
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="psql nicht gefunden")
         except subprocess.TimeoutExpired:
             raise HTTPException(status_code=504, detail="Restore Timeout (>300s)")
 
-        if result.returncode != 0:
-            stderr = result.stderr.decode("utf-8", errors="replace")
+        if restore_result.returncode != 0:
+            stderr = restore_result.stderr.decode("utf-8", errors="replace")
             error_lines = [l for l in stderr.splitlines() if "ERROR" in l]
             if error_lines:
                 raise HTTPException(status_code=500, detail="\n".join(error_lines[-10:]))
+
+        # 4. uploads.tar.gz → UPLOAD_DIR
+        uploads_archive = os.path.join(tmpdir, "uploads.tar.gz")
+        if os.path.isfile(uploads_archive):
+            if os.path.isdir(UPLOAD_DIR):
+                shutil.rmtree(UPLOAD_DIR)
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+            try:
+                with tarfile.open(uploads_archive, mode="r:gz") as uploads_tar:
+                    uploads_tar.extractall(os.path.dirname(UPLOAD_DIR))
+            except tarfile.TarError as e:
+                raise HTTPException(status_code=500, detail=f"Fehler beim Entpacken der Uploads: {e}")
 
     return {"success": True, "message": "Datenbank und Dateien erfolgreich wiederhergestellt"}

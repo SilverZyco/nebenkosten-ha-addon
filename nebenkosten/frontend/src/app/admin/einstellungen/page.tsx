@@ -56,9 +56,9 @@ export default function EinstellungenPage() {
   async function downloadBackup() {
     setExporting(true);
     try {
-      const response = await api.get("/admin/backup/export", { responseType: "blob" });
-      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const filename = `nebenkosten_backup_${timestamp}.zip`;
+      const response = await api.get("/admin/backup/download", { responseType: "blob" });
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "").slice(0, 15);
+      const filename = `nebenkosten_${timestamp}.tar.gz`;
       const url = URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement("a");
       a.href = url;
@@ -76,8 +76,8 @@ export default function EinstellungenPage() {
   async function handleRestoreFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.endsWith(".sql") && !file.name.endsWith(".zip")) {
-      toast.error("Nur .zip oder .sql Dateien erlaubt");
+    if (!file.name.endsWith(".tar.gz")) {
+      toast.error("Nur .tar.gz Dateien erlaubt");
       return;
     }
 
@@ -265,7 +265,7 @@ export default function EinstellungenPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".zip,.sql"
+                accept=".tar.gz,application/x-tar,application/gzip"
                 className="hidden"
                 onChange={handleRestoreFile}
               />
@@ -274,9 +274,9 @@ export default function EinstellungenPage() {
             <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
               <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700 dark:text-blue-300">
-                <strong>Backup herunterladen</strong> speichert die komplette Datenbank als SQL-Datei auf deinem PC.
-                <strong className="ml-1">Backup einspielen</strong> stellt eine zuvor heruntergeladene .sql Datei wieder her.
-                Beim Restore gehen alle aktuellen Daten verloren.
+                <strong>Backup herunterladen</strong> speichert Datenbank + alle Dateien als .tar.gz auf deinem PC.
+                <strong className="ml-1">Backup einspielen</strong> stellt eine zuvor heruntergeladene .tar.gz Datei wieder her.
+                Beim Restore gehen alle aktuellen Daten und Dateien verloren.
               </p>
             </div>
 
