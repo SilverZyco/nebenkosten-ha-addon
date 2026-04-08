@@ -14,10 +14,16 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        'meter_readings',
-        sa.Column('photo_filename', sa.String(200), nullable=True)
-    )
+    conn = op.get_bind()
+    result = conn.execute(sa.text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name='meter_readings' AND column_name='photo_filename'"
+    ))
+    if not result.fetchone():
+        op.add_column(
+            'meter_readings',
+            sa.Column('photo_filename', sa.String(200), nullable=True)
+        )
 
 
 def downgrade():
