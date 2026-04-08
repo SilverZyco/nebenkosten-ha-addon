@@ -99,11 +99,30 @@ fi
 if [ "$RESET_ADMIN_EMAIL" != "none" ] && [ "$RESET_ADMIN_PASSWORD" != "none" ]; then
     echo ">>> Setze Admin-Passwort zurück für: $RESET_ADMIN_EMAIL"
     su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres -o '-c listen_addresses=localhost -c unix_socket_directories=/var/run/postgresql' start -w"
-    # Passwort-Hash mit Python generieren
-    NEW_HASH=$(python3 -c "from passlib.context import CryptContext; ctx = CryptContext(schemes=['bcrypt']); print(ctx.hash('${RESET_ADMIN_PASSWORD}'))")
-    su postgres -c "psql -U nebenkosten -d nebenkosten -c \"UPDATE users SET password_hash='${NEW_HASH}', email='${RESET_ADMIN_EMAIL}' WHERE id = (SELECT id FROM users WHERE role='admin' ORDER BY created_at LIMIT 1);\""
+    # Python übernimmt Hash-Generierung UND DB-Update (vermeidet Shell-Escaping von $2b$...)
+    RESET_ADMIN_EMAIL="$RESET_ADMIN_EMAIL" \
+    RESET_ADMIN_PASSWORD="$RESET_ADMIN_PASSWORD" \
+    DATABASE_URL_SYNC="postgresql://nebenkosten:${POSTGRES_PASSWORD}@localhost/nebenkosten" \
+    python3 << 'PYEOF'
+import os
+from passlib.context import CryptContext
+from sqlalchemy import create_engine, text
+
+ctx = CryptContext(schemes=['bcrypt'])
+new_hash = ctx.hash(os.environ['RESET_ADMIN_PASSWORD'])
+email = os.environ['RESET_ADMIN_EMAIL']
+db_url = os.environ['DATABASE_URL_SYNC']
+
+engine = create_engine(db_url)
+with engine.connect() as conn:
+    conn.execute(
+        text("UPDATE users SET password_hash=:hash, email=:email WHERE id=(SELECT id FROM users WHERE role='admin' ORDER BY created_at LIMIT 1)"),
+        {'hash': new_hash, 'email': email}
+    )
+    conn.commit()
+print(f'>>> Admin-Passwort erfolgreich zurückgesetzt für: {email}')
+PYEOF
     su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /data/postgres stop -w"
-    echo ">>> Admin-Passwort erfolgreich zurückgesetzt."
 fi
 
 echo ">>> Starte alle Dienste..."
