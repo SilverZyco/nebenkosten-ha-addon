@@ -220,6 +220,18 @@ async def restore_backup(
         pg_env = {**os.environ, "PGPASSWORD": db["password"]}
         pg_base = ["-h", db["host"], "-p", db["port"], "-U", db["user"]]
 
+        # Erst alle anderen Verbindungen zur DB trennen (als postgres Superuser via Unix Socket)
+        # Notwendig damit DROP SCHEMA nicht auf aktive Verbindungen wartet
+        terminate_sql = (
+            f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            f"WHERE datname='{db['dbname']}' AND pid <> pg_backend_pid();"
+        )
+        subprocess.run(
+            ["su", "postgres", "-c", f"{PSQL} -d postgres -c \"{terminate_sql}\""],
+            capture_output=True,
+            timeout=15,
+        )
+
         # Schema leeren
         drop_sql = "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;"
         try:
