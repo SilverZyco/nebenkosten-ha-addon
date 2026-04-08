@@ -229,7 +229,9 @@ export const instructionsApi = {
   upload: (file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    return api.post("/admin/instructions", fd);
+    return api.post("/admin/instructions", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
   update: (id: string, data: { title?: string; tenant_user_id?: string | null }) =>
     api.patch(`/admin/instructions/${id}`, data),
