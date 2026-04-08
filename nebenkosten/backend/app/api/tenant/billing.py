@@ -87,6 +87,7 @@ async def get_my_billing_detail(
         "cost_breakdown": ab.cost_breakdown,
         "has_pdf": bool(ab.pdf_filename),
         "released_at": ab.released_at.isoformat() if ab.released_at else None,
+        "receipt_filename": ab.receipt_filename,
     }
 
 
@@ -133,5 +134,5 @@ async def tenant_download_receipt(
         raise HTTPException(status_code=403, detail="Kein Zugriff")
     path = os.path.join(settings.UPLOAD_DIR, ab.receipt_filename)
     if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+        raise HTTPException(status_code=404, detail="Quittungs-PDF nicht gefunden. Bitte den Administrator bitten, die Quittung neu auszustellen.")
     return FileResponse(path=path, filename="Quittung.pdf", media_type="application/pdf")
